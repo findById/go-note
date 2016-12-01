@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	source = flag.String("source", "posted", "target html path.")
-	target = flag.String("target", "html", "target html path.")
+	source = flag.String("source", "posted", "source dir.")
+	target = flag.String("target", "html", "target dir.")
 )
 
 func InitHandler(path string) error {
@@ -92,7 +92,7 @@ func InitHandler(path string) error {
 
 		tpl := model["template"];
 		if (tpl == "") {
-			tpl = "index.html";
+			tpl = "index.tpl";
 		}
 		log.Println("template: " + tpl);
 

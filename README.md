@@ -1,0 +1,3 @@
+## Using "html/template" to output.
+### like: markdown to html.
+#### i can do more...
