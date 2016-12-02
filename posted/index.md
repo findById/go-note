@@ -1,5 +1,5 @@
 ---
-template:       index.tpl
+template:       index.tmpl
 title:          Index
 date:           2016-12-01 15:00:00 +0800
 keywords:       Hello World
