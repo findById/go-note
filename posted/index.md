@@ -6,4 +6,13 @@ keywords:       Hello World
 description:    Hello World
 ---
 
-Hello World!
+# Try Go
+```golang
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, 世界")
+}
+```
