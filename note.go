@@ -13,6 +13,8 @@ import (
 	"io/ioutil"
 	"bytes"
 	"io"
+	"net/url"
+	"sort"
 )
 
 func init() {
@@ -82,7 +84,39 @@ func ParseFile(path string) (map[string]string, error) {
 	return Parse(string(buffer)), nil
 }
 
+type Doc struct {
+	Permalink string
+
+	Title     string
+	Desc      string
+	Date      string
+}
+
+type DocSlice [] Doc
+
+func (a DocSlice) Len() int {
+	return len(a)
+}
+func (a DocSlice) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+func (a DocSlice) Less(i, j int) bool {
+	time1 := a[i].Date
+	time2 := a[j].Date
+	t1, err := time.Parse("2006-01-02 15:04:05 -0700", time1)
+	if err != nil {
+		return true
+	}
+	t2, err := time.Parse("2006-01-02 15:04:05 -0700", time2)
+	if err != nil {
+		return false
+	}
+	return t1.Before(t2)
+}
+
 func InitHandler(path string) error {
+	docs := []Doc{}
+
 	const ext = ".md"
 	fn := func(path string, info os.FileInfo, err error) error {
 		if strings.ToLower(filepath.Ext(path)) != ext || info == nil || info.IsDir() {
@@ -104,6 +138,20 @@ func InitHandler(path string) error {
 			os.Mkdir(*target + dir, os.ModeDir)
 			filename = dir + string(os.PathSeparator) + filename
 		}
+
+		// for list start
+		doc := Doc{}
+		doc.Title = model["title"]
+		doc.Desc = model["description"]
+		doc.Date = model["date"]
+		rp := strings.Replace(filename + ".html", string(os.PathSeparator), "/", -1)
+		if strings.HasPrefix(rp, "/") {
+			rp = rp[1:]
+		}
+		doc.Permalink = rp
+		docs = append(docs, doc)
+		// for list end
+
 		filename = *target + string(os.PathSeparator) + filename + ".html"
 		log.Println("filename: " + filename)
 
@@ -133,6 +181,28 @@ func InitHandler(path string) error {
 	if err != nil {
 		return err
 	}
+
+	// for list start
+	sort.Sort(sort.Reverse(DocSlice(docs)))
+
+	model := make(map[string]interface{})
+	model["title"] = "Articles"
+	model["items"] = docs
+	t, err := template.ParseFiles("templates/list.tmpl")
+	if err != nil {
+		return err
+	}
+	wr := bytes.NewBufferString("")
+	err = t.Execute(wr, model)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(*target + string(os.PathSeparator) + "list.html", wr.Bytes(), os.ModeAppend)
+	if err != nil {
+		return err
+	}
+	// for list end
+
 	return nil
 }
 
@@ -153,13 +223,17 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := "index.html"
 
-	path := r.RequestURI
+	uri, err := url.ParseRequestURI(r.RequestURI)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	path := uri.Path
 	switch path {
 	case "/", "/index.html":
 		break
 	default:
 		filename = strings.Replace(path, "../", "/", -1)
-		filename = strings.Replace(filename, "%20", " ", -1)
 		filename = strings.Replace(filename, "/", string(os.PathSeparator), -1)
 		break
 	}
@@ -181,15 +255,19 @@ func ViewHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewHandler(w http.ResponseWriter, r *http.Request) {
-	path := r.RequestURI
-	preLen := len("/preview/");
+	uri, err := url.ParseRequestURI(r.RequestURI)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	path := uri.Path
+	preLen := len("/preview/")
 	if len(path) <= preLen {
 		http.NotFound(w, r)
 		return
 	}
 	path = path[preLen:]
 	filename := strings.Replace(path, "../", "/", -1)
-	filename = strings.Replace(filename, "%20", " ", -1)
 	filename = strings.Replace(filename, "/", string(os.PathSeparator), -1)
 	log.Println(filename)
 

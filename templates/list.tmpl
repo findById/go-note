@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.title}}</title>
+
+    <style>
+        .wrapper {
+            max-width: 1500px;
+            width: 90%;
+            margin: 0 auto;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+            box-sizing: border-box;
+            background: #fff;
+        }
+
+        .item {
+            margin: 0 0 1em 0;
+            padding: 0.8em 1.5em 1.5em;
+            box-shadow: 0 0 4px #ddd;
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+
+        .post-title {
+            padding: 0.2em 0.2em 0.2em;
+        }
+
+        .post-title a {
+            text-decoration: none;
+        }
+
+        .post-title a:hover, .post-title a:active {
+            color: #e84747;
+        }
+
+        .description {
+            width: 100%;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+<section id="content" class="wrapper">
+    {{ range .items}}
+    <div class="item">
+        <div class="post-title">
+            <span><h1><a href="/{{.Permalink}}">{{.Title}}</a></h1></span>
+        </div>
+        <div class="post-meta">
+            <span>Posted on {{.Date}}  |  by admin</span>
+        </div>
+        <br/>
+        <div class="description">
+            <span>{{.Desc}}</span>
+        </div>
+    </div>
+    {{end}}
+</section>
+</body>
+</html>
