@@ -117,9 +117,10 @@ func (a DocSlice) Less(i, j int) bool {
 func InitHandler(path string) error {
 	docs := []Doc{}
 
-	const ext = ".md"
+	const prefix = "2006-01-02";
+	const suffix = ".md"
 	fn := func(path string, info os.FileInfo, err error) error {
-		if strings.ToLower(filepath.Ext(path)) != ext || info == nil || info.IsDir() {
+		if strings.ToLower(filepath.Ext(path)) != suffix || info == nil || info.IsDir() {
 			return nil
 		}
 		model, err := ParseFile(path)
@@ -127,17 +128,22 @@ func InitHandler(path string) error {
 			return err
 		}
 
-		filename := strings.Replace(model["title"], " ", "-", -1)
-		log.Println("filename: " + filename)
-
 		dir := path[len(*source):]
 		dir = dir[0:strings.LastIndex(dir, string(os.PathSeparator))]
 		dir = strings.TrimSpace(dir)
-		log.Println("dir: " + dir)
-		if dir != "" {
-			os.Mkdir(*target + dir, os.ModeDir)
-			filename = dir + string(os.PathSeparator) + filename
+
+		name := info.Name();
+		filename := name[0:len(name) - len(suffix)]
+		if len(filename) > (len(prefix) + 1) {
+			// yyyy-MM-dd-*.md ==> yyyy-MM-dd/*.html
+			_, err := time.Parse(prefix, filename[0:len(prefix)]);
+			if err == nil {
+				dir = dir + string(os.PathSeparator) + filename[0:len(prefix)];
+				filename = filename[len(prefix) + 1:]
+			}
 		}
+		os.MkdirAll(*target + string(os.PathSeparator) + dir, os.ModeDir)
+		filename = dir + string(os.PathSeparator) + filename;
 
 		// for list start
 		doc := Doc{}
@@ -153,7 +159,9 @@ func InitHandler(path string) error {
 		// for list end
 
 		filename = *target + string(os.PathSeparator) + filename + ".html"
-		log.Println("filename: " + filename)
+		// filename = strings.Replace(filename, string(os.PathSeparator) + string(os.PathSeparator), string(os.PathSeparator), -1)
+		log.Println("source: " + path)
+		log.Println("target: " + filename)
 
 		tpl := model["template"]
 		if tpl == "" {
