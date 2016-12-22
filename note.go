@@ -24,6 +24,7 @@ func init() {
 var (
 	source = flag.String("source", "posted", "source dir.")
 	target = flag.String("target", "html", "target dir.")
+	debug = flag.Bool("debug", false, "debug model.")
 )
 
 // Core
@@ -133,6 +134,7 @@ func InitHandler(path string) error {
 		dir = strings.TrimSpace(dir)
 
 		name := info.Name();
+		name = strings.Replace(name, " ", "-", -1)
 		filename := name[0:len(name) - len(suffix)]
 		if len(filename) > (len(prefix) + 1) {
 			// yyyy-MM-dd-*.md ==> yyyy-MM-dd/*.html
@@ -214,15 +216,31 @@ func InitHandler(path string) error {
 	return nil
 }
 
+var lastParseTime = time.Now().Unix()
+
 func InstallHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("console", "request", "[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "][" +
-		r.RemoteAddr + "][" + r.UserAgent() + "][" + r.Host + r.RequestURI + "]")
-	err := InitHandler(*source)
-	if err != nil {
-		w.Write([]byte("failed. " + err.Error()))
-	} else {
-		w.Write([]byte("success."))
+	log.Println("[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "][" + r.RemoteAddr + "][" +
+		r.UserAgent() + "][" + r.Host + r.RequestURI + "]")
+
+	if !*debug {
+		parseTime := time.Now().Unix()
+		if (parseTime - 5) <= lastParseTime {
+			w.Write([]byte("Refuse to handle."))
+			lastParseTime = parseTime;
+			return;
+		}
+		lastParseTime = parseTime;
 	}
+
+	go func() {
+		err := InitHandler(*source)
+		if err != nil {
+			log.Println("failed. " + err.Error())
+		} else {
+			log.Println("success.")
+		}
+	}()
+	w.Write([]byte("handled."))
 }
 
 func ViewHandler(w http.ResponseWriter, r *http.Request) {
@@ -305,13 +323,14 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-	os.Mkdir(*source, os.ModeDir)
-	os.Mkdir(*target, os.ModeDir)
+	os.MkdirAll(*source, os.ModeDir)
+	os.MkdirAll(*target, os.ModeDir)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/preview/", PreviewHandler)
 	mux.HandleFunc("/install", InstallHandler)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 	mux.HandleFunc("/", ViewHandler)
 
 	log.Println("template: templates, source: " + *source + ", target: " + *target)
