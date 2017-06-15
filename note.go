@@ -21,7 +21,13 @@ func init() {
 	os.Mkdir("templates", os.ModeDir)
 }
 
+const (
+	TEMPLATE_SUFFIX = ".tmpl"
+	IGNORE_APPEND_LIST = "index.html"
+)
+
 var (
+	port = flag.String("port", "9090", "accept port.")
 	source = flag.String("source", "posted", "source dir.")
 	target = flag.String("target", "html", "target dir.")
 	debug = flag.Bool("debug", false, "debug model.")
@@ -157,7 +163,9 @@ func InitHandler(path string) error {
 			rp = rp[1:]
 		}
 		doc.Permalink = rp
-		docs = append(docs, doc)
+		if (rp != IGNORE_APPEND_LIST) {
+			docs = append(docs, doc)
+		}
 		// for list end
 
 		filename = *target + string(os.PathSeparator) + filename + ".html"
@@ -167,11 +175,11 @@ func InitHandler(path string) error {
 
 		tpl := model["template"]
 		if tpl == "" {
-			tpl = "root.html"
+			tpl = "default"
 		}
 		log.Println("template: " + tpl)
 
-		t, err := template.ParseFiles("templates/" + tpl)
+		t, err := template.ParseFiles("templates/" + tpl + TEMPLATE_SUFFIX)
 		if err != nil {
 			return err
 		}
@@ -198,7 +206,7 @@ func InitHandler(path string) error {
 	model := make(map[string]interface{})
 	model["title"] = "Articles"
 	model["items"] = docs
-	t, err := template.ParseFiles("templates/list.tmpl")
+	t, err := template.ParseFiles("templates/list" + TEMPLATE_SUFFIX)
 	if err != nil {
 		return err
 	}
@@ -305,11 +313,11 @@ func PreviewHandler(w http.ResponseWriter, r *http.Request) {
 
 	tpl := model["template"]
 	if tpl == "" {
-		tpl = "root.html"
+		tpl = "default"
 	}
 	log.Println("template: " + tpl)
 
-	t, err := template.ParseFiles("templates/" + tpl)
+	t, err := template.ParseFiles("templates/" + tpl + TEMPLATE_SUFFIX)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -319,7 +327,7 @@ func PreviewHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	if *source == "" || *target == "" {
+	if *port == "" || *source == "" || *target == "" {
 		flag.PrintDefaults()
 		return
 	}
@@ -333,9 +341,9 @@ func main() {
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 	mux.HandleFunc("/", ViewHandler)
 
-	log.Println("template: templates, source: " + *source + ", target: " + *target)
+	log.Println("port: " + *port, "template: templates, source: " + *source + ", target: " + *target)
 	go func() {
-		http.ListenAndServe(":9090", mux)
+		http.ListenAndServe(":" + *port, mux)
 	}()
 	select {}
 }

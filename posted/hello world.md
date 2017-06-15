@@ -1,5 +1,5 @@
 ---
-template:       article.tmpl
+template:       article
 title:          Hello World
 date:           2016-12-05 09:00:00 +0800
 keywords:       Hello World

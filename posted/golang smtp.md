@@ -1,5 +1,5 @@
 ---
-template:       article.tmpl
+template:       article
 title:          Golang smtp
 date:           2016-12-01 15:00:00 +0800
 keywords:       smtp
