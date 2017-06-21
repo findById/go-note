@@ -1,3 +1,11 @@
+---
+template:       article
+title:          MultipartHandler
+date:           2017-06-21 09:00:00 +0800
+keywords:       HttpUrlConnection multiple file uploads
+description:    HttpUrlConnection multiple file uploads
+---
+
 ```java
 package com;
 
