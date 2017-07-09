@@ -22,22 +22,22 @@ func init() {
 }
 
 const (
-	TEMPLATE_SUFFIX = ".tmpl"
+	TEMPLATE_SUFFIX    = ".html"
 	IGNORE_APPEND_LIST = "index.html"
 )
 
 var (
-	port = flag.String("port", "9090", "accept port.")
+	port   = flag.String("port", "9090", "accept port.")
 	source = flag.String("source", "posted", "source dir.")
 	target = flag.String("target", "html", "target dir.")
-	debug = flag.Bool("debug", false, "debug model.")
+	debug  = flag.Bool("debug", false, "debug model.")
 )
 
 // Core
 func Parse(buffer string) map[string]string {
 	const (
 		READ_HEADER int = 0
-		READ_DATA int = 1
+		READ_DATA   int = 1
 	)
 	status := READ_HEADER
 
@@ -68,7 +68,7 @@ func Parse(buffer string) map[string]string {
 		index := strings.Index(head, ":")
 		if index > 0 && index < len(head) {
 			key := strings.TrimSpace(head[0:index])
-			value := strings.TrimSpace(head[index + 1:])
+			value := strings.TrimSpace(head[index+1:])
 			model[key] = value
 			log.Println(key + " = " + value)
 			continue
@@ -94,9 +94,9 @@ func ParseFile(path string) (map[string]string, error) {
 type Doc struct {
 	Permalink string
 
-	Title     string
-	Desc      string
-	Date      string
+	Title string
+	Desc  string
+	Date  string
 }
 
 type DocSlice [] Doc
@@ -124,7 +124,7 @@ func (a DocSlice) Less(i, j int) bool {
 func InitHandler(path string) error {
 	docs := []Doc{}
 
-	const prefix = "2006-01-02";
+	const prefix = "2006-01-02"
 	const suffix = ".md"
 	fn := func(path string, info os.FileInfo, err error) error {
 		if strings.ToLower(filepath.Ext(path)) != suffix || info == nil || info.IsDir() {
@@ -139,31 +139,31 @@ func InitHandler(path string) error {
 		dir = dir[0:strings.LastIndex(dir, string(os.PathSeparator))]
 		dir = strings.TrimSpace(dir)
 
-		name := info.Name();
+		name := info.Name()
 		name = strings.Replace(name, " ", "-", -1)
-		filename := name[0:len(name) - len(suffix)]
+		filename := name[0:len(name)-len(suffix)]
 		if len(filename) > (len(prefix) + 1) {
 			// yyyy-MM-dd-*.md ==> yyyy-MM-dd/*.html
-			_, err := time.Parse(prefix, filename[0:len(prefix)]);
+			_, err := time.Parse(prefix, filename[0:len(prefix)])
 			if err == nil {
-				dir = dir + string(os.PathSeparator) + filename[0:len(prefix)];
-				filename = filename[len(prefix) + 1:]
+				dir = dir + string(os.PathSeparator) + filename[0:len(prefix)]
+				filename = filename[len(prefix)+1:]
 			}
 		}
-		os.MkdirAll(*target + string(os.PathSeparator) + dir, os.ModeDir)
-		filename = dir + string(os.PathSeparator) + filename;
+		os.MkdirAll(*target+string(os.PathSeparator)+dir, os.ModeDir)
+		filename = dir + string(os.PathSeparator) + filename
 
 		// for list start
 		doc := Doc{}
 		doc.Title = model["title"]
 		doc.Desc = model["description"]
 		doc.Date = model["date"]
-		rp := strings.Replace(filename + ".html", string(os.PathSeparator), "/", -1)
+		rp := strings.Replace(filename+".html", string(os.PathSeparator), "/", -1)
 		if strings.HasPrefix(rp, "/") {
 			rp = rp[1:]
 		}
 		doc.Permalink = rp
-		if (rp != IGNORE_APPEND_LIST) {
+		if rp != IGNORE_APPEND_LIST {
 			docs = append(docs, doc)
 		}
 		// for list end
@@ -174,6 +174,9 @@ func InitHandler(path string) error {
 		log.Println("target: " + filename)
 
 		tpl := model["template"]
+		if tpl == "" {
+			tpl = model["layout"]
+		}
 		if tpl == "" {
 			tpl = "default"
 		}
@@ -215,7 +218,7 @@ func InitHandler(path string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(*target + string(os.PathSeparator) + "list.html", wr.Bytes(), os.ModeAppend)
+	err = ioutil.WriteFile(*target+string(os.PathSeparator)+"list.html", wr.Bytes(), os.ModeAppend)
 	if err != nil {
 		return err
 	}
@@ -232,12 +235,13 @@ func InstallHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !*debug {
 		parseTime := time.Now().Unix()
-		if (parseTime - 5) <= lastParseTime {
+		r.ParseForm()
+		if (parseTime - 5*60) <= lastParseTime {
 			w.Write([]byte("Refuse to handle."))
-			lastParseTime = parseTime;
-			return;
+			lastParseTime = parseTime
+			return
 		}
-		lastParseTime = parseTime;
+		lastParseTime = parseTime
 	}
 
 	go func() {
@@ -252,8 +256,8 @@ func InstallHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ViewHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("console", "request", "[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "][" +
-		r.RemoteAddr + "][" + r.UserAgent() + "][" + r.Host + r.RequestURI + "]")
+	log.Println("console", "request", "[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "]["+
+		r.RemoteAddr+ "]["+ r.UserAgent()+ "]["+ r.Host+ r.RequestURI+ "]")
 
 	filename := "index.html"
 
@@ -334,12 +338,16 @@ func main() {
 	os.MkdirAll(*source, os.ModeDir)
 	os.MkdirAll(*target, os.ModeDir)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/preview/", PreviewHandler)
-	mux.HandleFunc("/install", InstallHandler)
+	router := []Router{
+		Router{"GET", "/preview/", PreviewHandler},
+		Router{"GET", "/install/", InstallHandler},
+		Router{"GET", "/", ViewHandler},
+	}
+
+	mux := NewMux(router)
+
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
-	mux.HandleFunc("/", ViewHandler)
 
 	log.Println("port: " + *port, "template: templates, source: " + *source + ", target: " + *target)
 	go func() {
