@@ -1,20 +1,20 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
+	"html/template"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"html/template"
-	"time"
-	"strings"
+	"net/url"
 	"os"
 	"path/filepath"
-	"bufio"
-	"io/ioutil"
-	"bytes"
-	"io"
-	"net/url"
 	"sort"
+	"strings"
+	"time"
 )
 
 func init() {
@@ -24,6 +24,17 @@ func init() {
 const (
 	TEMPLATE_SUFFIX    = ".html"
 	IGNORE_APPEND_LIST = "index.html"
+
+	KEY_HEADER_TEMPLATE    = "template"
+	KEY_HEADER_TITLE       = "title"
+	KEY_HEADER_AUTHORS     = "authors"
+	KEY_HEADER_TAGS        = "tags"
+	KEY_HEADER_CREATE_AT   = "create_at"
+	KEY_HEADER_PRIVATE     = "private"
+	KEY_HEADER_THUMBNAIL   = "thumbnail"
+	KEY_HEADER_KEYWORDS    = "keywords"
+	KEY_HEADER_DESCRIPTION = "description"
+	KEY_MARKDOWN           = "content"
 )
 
 var (
@@ -44,7 +55,7 @@ func Parse(buffer string) map[string]string {
 	br := bufio.NewReader(strings.NewReader(buffer))
 
 	model := make(map[string]string)
-	model["title"] = "Insert title here"
+	model[KEY_HEADER_TITLE] = "Insert title here"
 
 	contentBuffer := bytes.NewBufferString("")
 	for {
@@ -74,7 +85,7 @@ func Parse(buffer string) map[string]string {
 			continue
 		}
 	}
-	model["content"] = contentBuffer.String()
+	model[KEY_MARKDOWN] = contentBuffer.String()
 	return model
 }
 
@@ -89,36 +100,6 @@ func ParseFile(path string) (map[string]string, error) {
 		return nil, err
 	}
 	return Parse(string(buffer)), nil
-}
-
-type Doc struct {
-	Permalink string
-
-	Title string
-	Desc  string
-	Date  string
-}
-
-type DocSlice [] Doc
-
-func (a DocSlice) Len() int {
-	return len(a)
-}
-func (a DocSlice) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
-func (a DocSlice) Less(i, j int) bool {
-	time1 := a[i].Date
-	time2 := a[j].Date
-	t1, err := time.Parse("2006-01-02 15:04:05 -0700", time1)
-	if err != nil {
-		return true
-	}
-	t2, err := time.Parse("2006-01-02 15:04:05 -0700", time2)
-	if err != nil {
-		return false
-	}
-	return t1.Before(t2)
 }
 
 func InitHandler(path string) error {
@@ -141,7 +122,7 @@ func InitHandler(path string) error {
 
 		name := info.Name()
 		name = strings.Replace(name, " ", "-", -1)
-		filename := name[0:len(name)-len(suffix)]
+		filename := name[0 : len(name)-len(suffix)]
 		if len(filename) > (len(prefix) + 1) {
 			// yyyy-MM-dd-*.md ==> yyyy-MM-dd/*.html
 			_, err := time.Parse(prefix, filename[0:len(prefix)])
@@ -155,9 +136,12 @@ func InitHandler(path string) error {
 
 		// for list start
 		doc := Doc{}
-		doc.Title = model["title"]
-		doc.Desc = model["description"]
+		doc.Title = model[KEY_HEADER_TITLE]
+		doc.Desc = model[KEY_HEADER_DESCRIPTION]
 		doc.Date = model["date"]
+		if model[KEY_HEADER_CREATE_AT] != "" {
+			doc.Date = model[KEY_HEADER_CREATE_AT]
+		}
 		rp := strings.Replace(filename+".html", string(os.PathSeparator), "/", -1)
 		if strings.HasPrefix(rp, "/") {
 			rp = rp[1:]
@@ -173,7 +157,7 @@ func InitHandler(path string) error {
 		log.Println("source: " + path)
 		log.Println("target: " + filename)
 
-		tpl := model["template"]
+		tpl := model[KEY_HEADER_TEMPLATE]
 		if tpl == "" {
 			tpl = model["layout"]
 		}
@@ -207,7 +191,7 @@ func InitHandler(path string) error {
 	sort.Sort(sort.Reverse(DocSlice(docs)))
 
 	model := make(map[string]interface{})
-	model["title"] = "Articles"
+	model[KEY_HEADER_TITLE] = "Articles"
 	model["items"] = docs
 	t, err := template.ParseFiles("templates/list" + TEMPLATE_SUFFIX)
 	if err != nil {
@@ -256,8 +240,8 @@ func InstallHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ViewHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("console", "request", "[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "]["+
-		r.RemoteAddr+ "]["+ r.UserAgent()+ "]["+ r.Host+ r.RequestURI+ "]")
+	log.Println("console", "request", "["+time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05")+"]["+
+		r.RemoteAddr+"]["+r.UserAgent()+"]["+r.Host+r.RequestURI+"]")
 
 	filename := "index.html"
 
@@ -315,7 +299,7 @@ func PreviewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tpl := model["template"]
+	tpl := model[KEY_HEADER_TEMPLATE]
 	if tpl == "" {
 		tpl = "default"
 	}
@@ -349,9 +333,9 @@ func main() {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 
-	log.Println("port: " + *port, "template: templates, source: " + *source + ", target: " + *target)
+	log.Println("port: "+*port, "template: templates, source: "+*source+", target: "+*target)
 	go func() {
-		http.ListenAndServe(":" + *port, mux)
+		http.ListenAndServe(":"+*port, mux)
 	}()
 	select {}
 }
