@@ -27,4 +27,3 @@ key:value
 |keywords|optional||keywords: keywords|
 |description|optional||description: description|
 |thumbnail|optional||thumbnail: https://cdn-images-1.medium.com/max/1600/1*Nst9mLu02tSxQCvkAo3L0A.png|
-|authors|optional||authors: |

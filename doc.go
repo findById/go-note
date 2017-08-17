@@ -7,9 +7,11 @@ import (
 type Doc struct {
 	Permalink string
 
-	Title string
-	Desc  string
-	Date  string
+	Title  string
+	Desc   string
+	Date   string
+	Tag    string
+	Author string
 }
 
 type DocSlice []Doc

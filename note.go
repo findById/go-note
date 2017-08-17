@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"flag"
 	"html/template"
@@ -18,7 +17,7 @@ import (
 )
 
 func init() {
-	os.Mkdir("templates", os.ModeDir)
+	os.Mkdir("templates", os.ModePerm)
 }
 
 const (
@@ -34,60 +33,14 @@ const (
 	KEY_HEADER_THUMBNAIL   = "thumbnail"
 	KEY_HEADER_KEYWORDS    = "keywords"
 	KEY_HEADER_DESCRIPTION = "description"
-	KEY_MARKDOWN           = "content"
 )
 
 var (
-	port   = flag.String("port", "9090", "accept port.")
+	port   = flag.String("p", "9090", "accept port.")
 	source = flag.String("source", "posted", "source dir.")
 	target = flag.String("target", "html", "target dir.")
-	debug  = flag.Bool("debug", false, "debug model.")
+	debug  = flag.Bool("d", false, "debug model.")
 )
-
-// Core
-func Parse(buffer string) map[string]string {
-	const (
-		READ_HEADER int = 0
-		READ_DATA   int = 1
-	)
-	status := READ_HEADER
-
-	br := bufio.NewReader(strings.NewReader(buffer))
-
-	model := make(map[string]string)
-	model[KEY_HEADER_TITLE] = "Insert title here"
-
-	contentBuffer := bytes.NewBufferString("")
-	for {
-		temp, _, err := br.ReadLine()
-		if err != nil {
-			break
-		}
-		line := string(temp)
-
-		if status == READ_DATA {
-			contentBuffer.WriteString(line + "\n")
-			continue
-		}
-		// Empty line. Next read data
-		if strings.TrimSpace(line) == "" {
-			status = READ_DATA
-			continue
-		}
-		// Handle head
-		head := strings.TrimSpace(line)
-		index := strings.Index(head, ":")
-		if index > 0 && index < len(head) {
-			key := strings.TrimSpace(head[0:index])
-			value := strings.TrimSpace(head[index+1:])
-			model[key] = value
-			log.Println(key + " = " + value)
-			continue
-		}
-	}
-	model[KEY_MARKDOWN] = contentBuffer.String()
-	return model
-}
 
 func ParseFile(path string) (map[string]string, error) {
 	f, err := os.Open(path)
@@ -99,7 +52,7 @@ func ParseFile(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Parse(string(buffer)), nil
+	return ParseMessage(string(buffer)), nil
 }
 
 func InitHandler(path string) error {
@@ -115,6 +68,13 @@ func InitHandler(path string) error {
 		if err != nil {
 			return err
 		}
+		if model[KEY_HEADER_PRIVATE] == "true" {
+			// ignored
+			return nil
+		}
+		if model[KEY_HEADER_TITLE] == "" {
+			model[KEY_HEADER_TITLE] = "Insert title here"
+		}
 
 		dir := path[len(*source):]
 		dir = dir[0:strings.LastIndex(dir, string(os.PathSeparator))]
@@ -122,7 +82,7 @@ func InitHandler(path string) error {
 
 		name := info.Name()
 		name = strings.Replace(name, " ", "-", -1)
-		filename := name[0 : len(name)-len(suffix)]
+		filename := name[0: len(name)-len(suffix)]
 		if len(filename) > (len(prefix) + 1) {
 			// yyyy-MM-dd-*.md ==> yyyy-MM-dd/*.html
 			_, err := time.Parse(prefix, filename[0:len(prefix)])
@@ -131,12 +91,14 @@ func InitHandler(path string) error {
 				filename = filename[len(prefix)+1:]
 			}
 		}
-		os.MkdirAll(*target+string(os.PathSeparator)+dir, os.ModeDir)
+		os.MkdirAll(*target+string(os.PathSeparator)+dir, os.ModePerm)
 		filename = dir + string(os.PathSeparator) + filename
 
 		// for list start
 		doc := Doc{}
 		doc.Title = model[KEY_HEADER_TITLE]
+		doc.Author = model[KEY_HEADER_AUTHORS]
+		doc.Tag = model[KEY_HEADER_TAGS]
 		doc.Desc = model[KEY_HEADER_DESCRIPTION]
 		doc.Date = model["date"]
 		if model[KEY_HEADER_CREATE_AT] != "" {
@@ -175,7 +137,7 @@ func InitHandler(path string) error {
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(filename, wr.Bytes(), os.ModeAppend)
+		err = ioutil.WriteFile(filename, wr.Bytes(), os.ModePerm)
 		if err != nil {
 			return err
 		}
@@ -202,7 +164,7 @@ func InitHandler(path string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(*target+string(os.PathSeparator)+"list.html", wr.Bytes(), os.ModeAppend)
+	err = ioutil.WriteFile(*target+string(os.PathSeparator)+"list.html", wr.Bytes(), os.ModePerm)
 	if err != nil {
 		return err
 	}
@@ -240,8 +202,8 @@ func InstallHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ViewHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("console", "request", "["+time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05")+"]["+
-		r.RemoteAddr+"]["+r.UserAgent()+"]["+r.Host+r.RequestURI+"]")
+	log.Println("console", "request", "[" + time.Unix(time.Now().Unix(), 0).Format("2006-01-02 15:04:05") + "]["+
+		r.RemoteAddr+ "]["+ r.UserAgent()+ "]["+ r.Host+ r.RequestURI+ "]")
 
 	filename := "index.html"
 
@@ -319,8 +281,8 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-	os.MkdirAll(*source, os.ModeDir)
-	os.MkdirAll(*target, os.ModeDir)
+	os.MkdirAll(*source, os.ModePerm)
+	os.MkdirAll(*target, os.ModePerm)
 
 	router := []Router{
 		Router{"GET", "/preview/", PreviewHandler},
@@ -333,9 +295,9 @@ func main() {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 
-	log.Println("port: "+*port, "template: templates, source: "+*source+", target: "+*target)
+	log.Println("port: " + *port, "template: templates, source: " + *source + ", target: " + *target)
 	go func() {
-		http.ListenAndServe(":"+*port, mux)
+		http.ListenAndServe(":" + *port, mux)
 	}()
 	select {}
 }
