@@ -14,8 +14,9 @@ sudo tar -C /usr/lib/ -xzf gox.x.x.linux-amd64.tar.gz
 ## environment
 
 ```
-export GOROOT=/usr/lib/go/
+export GOROOT=/usr/lib/go
 export GOPATH=$HOME/dev/go/
+export PATH=$PATH:$GOPATH/bin
 export PATH=$PATH:$GOROOT/bin
 
 ```
